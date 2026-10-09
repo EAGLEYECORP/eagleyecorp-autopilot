@@ -15,12 +15,15 @@ npm run dev              # http://localhost:3000/autopilot
 npm run build
 ```
 Clés optionnelles dans `.env.local` (modèle : `.env.autopilot.example`). Sans clé, chaque moteur passe en mode démo.
+Idem pour la persistance : sans `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`, l'app tourne telle quelle (localStorage, pas de connexion). Pour l'activer, voir `.env.autopilot.example` et `supabase/migrations/0001_autopilot_init.sql`.
 
 ## Où est le code Autopilot
-- `app/autopilot/` — page + `autopilot.css` (design system)
-- `app/api/autopilot/[action]/route.js` — status, brand, plan, rewrite, generate (submit + polling), check, integrations, publish
-- `components/autopilot/` — Onboarding, BrandKit, Week, PostCard, Connections, store (localStorage), ui
-- `lib/autopilot/` — networks (règles par réseau + répartition des créneaux), brand (scraping avec garde SSRF), planner, media (MuAPI), guard (contrôle de marque), postiz, llm (API Anthropic)
+- `app/autopilot/` — page + `autopilot.css` (design system) ; `app/autopilot/login/` — connexion par lien magique
+- `app/auth/callback/` — échange le lien magique Supabase contre une session
+- `app/api/autopilot/[action]/route.js` — status, brand, plan, rewrite, generate (submit + polling), check, integrations, publish, et la persistance : credentials, businesses, posts, import, logout
+- `components/autopilot/` — Onboarding, BrandKit, Week, PostCard, Connections, store (localStorage **ou** Supabase selon la config, même API des deux côtés), LoginForm, ui
+- `lib/autopilot/` — networks (règles par réseau + répartition des créneaux), brand (scraping avec garde SSRF), planner, media (MuAPI), guard (contrôle de marque), postiz, llm (API Anthropic), credentials (clés chiffrées en base), supabase/ (clients serveur/navigateur, mapping lignes ↔ JS)
+- `supabase/migrations/` — schéma SQL (businesses, posts, api_credentials) + RLS, à appliquer une fois sur le projet Supabase
 Le reste du repo est l'app d'origine (`/studio`) : ne pas la casser.
 
 ## Règles
@@ -32,7 +35,7 @@ Le reste du repo est l'app d'origine (`/studio`) : ne pas la casser.
 - Interface en français.
 
 ## Feuille de route
-1. Base de données (Postgres/Supabase) + auth multi-clients, remplacer le localStorage.
+1. ✅ Base de données (Postgres/Supabase) + auth multi-clients, remplacer le localStorage. Code prêt (migration SQL, RLS, auth par lien magique, `components/autopilot/store.js` bascule automatiquement) — reste à créer le projet Supabase et renseigner les variables d'env pour l'activer en production. Mono-agence pour l'instant (toute l'équipe EAGLEYE voit tous les clients) ; si plusieurs agences doivent être isolées un jour, ajouter une table `organizations`.
 2. Génération hebdo automatique (cron) + e-mail au client pour valider.
 3. Boucle analytics : stats Postiz → planner.
 4. Facturation par forfait avec quota de crédits MuAPI.

@@ -21,7 +21,18 @@ No key → everything works with templates, branded placeholder visuals, and sim
 | MuAPI (images, videos) | `MUAPI_API_KEY` | Branded SVG placeholder |
 | Postiz (publishing) | `POSTIZ_API_KEY`, `POSTIZ_API_URL` | Simulated scheduling |
 
-Keys can be set server-side (`.env.local`, see `.env.autopilot.example`) — recommended in production — or entered in the **Connexions** tab (stored in the browser, sent only to this app's own API routes).
+Keys can be set server-side (`.env.local`, see `.env.autopilot.example`) — recommended in production — or entered in the **Connexions** tab.
+
+## Persistence & auth (optional)
+
+By default Autopilot keeps everything in the browser's localStorage and has no login — exactly as described above. Setting `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.autopilot.example`) switches it over to Postgres + magic-link auth instead, with no code changes needed:
+
+1. Create a project at [supabase.com](https://supabase.com), then run `supabase/migrations/0001_autopilot_init.sql` against it (SQL editor, or `supabase db push`). It creates `businesses`, `posts` and `api_credentials`, with row-level security restricting everything to signed-in users.
+2. Set `AUTOPILOT_CREDENTIALS_KEY` (`openssl rand -base64 32`) — encrypts the Anthropic/MuAPI/Postiz keys at rest once they're saved from the **Connexions** tab.
+3. Invite your teammates from Supabase's Authentication > Users (or let them sign in with their email — magic link, no password).
+4. Redeploy with the three env vars set. `/autopilot` and its API routes now require a session; the Connexions tab's keys move from the browser to the database.
+
+It's single-tenant by design: every signed-in EAGLEYE account sees every client. The first authenticated load imports any existing localStorage data once, then clears it.
 
 ## Run
 
@@ -45,9 +56,12 @@ Deploy like any Next.js app (Vercel, Netlify, Docker). The generate route return
 ## Code
 
 ```
-app/autopilot/                 page + styles (house style)
+app/autopilot/                 page + styles (house system) · login/ (magic link)
+app/auth/callback/             Supabase magic-link redirect target
 app/api/autopilot/[action]/    status · brand · plan · rewrite · generate · check · integrations · publish
-components/autopilot/          UI (Onboarding, BrandKit, Week, PostCard, Connections)
+                                credentials · businesses · posts · import · logout (persistence, Supabase-only)
+components/autopilot/          UI (Onboarding, BrandKit, Week, PostCard, Connections, LoginForm)
+                                store.js: localStorage or Supabase, same hook either way
 lib/autopilot/
   networks.js   per-network rules, formats, cadence, Postiz settings, slot planner
   brand.js      site scraping (SSRF-guarded) + brand kit
@@ -55,11 +69,14 @@ lib/autopilot/
   media.js      MuAPI submit/status + demo visuals
   guard.js      brand guard
   postiz.js     integrations, media upload, scheduling
+  credentials.js  encrypted engine keys in Postgres, once Supabase is configured
+  supabase/     server/browser Supabase clients, config detection, row <-> JS mapping
+supabase/migrations/            SQL schema + RLS for the above
 ```
 
 ## Known limits (v1 demo)
 
-- State lives in the browser (localStorage). For a multi-user SaaS, move businesses/posts to a database and add auth + billing.
+- Persistence (Supabase) and the weekly-cron automation below are the two pieces of roadmap item 1/2 in `CLAUDE.md`; persistence ships as opt-in (see above), the cron doesn't exist yet.
 - No recurring auto-plan yet: the week is generated on demand. Next step: a weekly cron that plans + generates and notifies the client to approve.
 - No analytics loop yet (Postiz stats → planner).
 - Generation costs come out of the MuAPI balance — price client plans with a credit quota.

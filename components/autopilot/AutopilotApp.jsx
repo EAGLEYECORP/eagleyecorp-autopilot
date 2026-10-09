@@ -18,6 +18,8 @@ const TABS = [
   ['connect', 'Connexions'],
 ];
 
+const PERSIST_ENABLED = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
 const toDateInput = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -216,6 +218,21 @@ export default function AutopilotApp() {
               <option value="__new">+ Nouveau client</option>
             </select>
           </label>
+
+          {PERSIST_ENABLED && (
+            <button
+              className="btn btn-sm btn-ghost btn-icon"
+              style={{ width: 40, minHeight: 40, flexShrink: 0 }}
+              title="Déconnexion"
+              aria-label="Déconnexion"
+              onClick={async () => {
+                await api(keys, 'logout', { method: 'POST' }).catch(() => {});
+                window.location.href = '/autopilot/login';
+              }}
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
       </header>
 
